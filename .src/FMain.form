@@ -1,0 +1,80 @@
+# Gambas Form File 3.0
+
+{ Form Form
+  MoveScaled(0,0,114.2857,42.8571)
+  Icon = Picture["AudioSpectrum.png"]
+  Border = False
+  Arrangement = Arrange.Vertical
+  { Settings Menu
+    Text = ("Settings")
+    Visible = False
+    { Scaling Menu
+      Text = ("Logarithmic Frequency Scaling")
+      Toggle = True
+      Checked = True
+      Shortcut = "Ctrl+L"
+    }
+    { Smoothing Menu
+      Text = ("Exponential Smoothing")
+      Toggle = True
+      Checked = True
+      Shortcut = "Ctrl+E"
+    }
+    { LockUI Menu
+      Text = ("Lock User Interface")
+      Toggle = True
+      Checked = True
+      Shortcut = "Ctrl+I"
+    }
+  }
+  { GLArea1 GLArea
+    MoveScaled(2,1,64,28)
+    Background = &H000000&
+    Expand = True
+    PopupMenu = "Settings"
+  }
+  { boxControls HBox
+    MoveScaled(2,31,96,4)
+    { btnPlay Button
+      MoveScaled(1,0,4,4)
+      AutoResize = True
+      Picture = Picture["icon:/small/play"]
+    }
+    { btnStop Button
+      MoveScaled(5,0,4,4)
+      AutoResize = True
+      Picture = Picture["icon:/small/stop"]
+    }
+    { lblTrackName Label
+      MoveScaled(11,0,73,4)
+      Expand = True
+    }
+    { btnOpen Button
+      MoveScaled(86,0,4,4)
+      AutoResize = True
+      Text = ("Open File ") & "..."
+      Picture = Picture["icon:/small/open"]
+    }
+    { btnSettings MenuButton
+      MoveScaled(90,0,6,4)
+      Picture = Picture["icon:/small/tools"]
+      Menu = "Settings"
+      MenuOnly = True
+    }
+  }
+  { boxTime HBox
+    MoveScaled(2,38,96,4)
+    { lblPosition Label
+      MoveScaled(1,1,8,2)
+      Text = ("0:00")
+    }
+    { sliderProgress Slider
+      MoveScaled(6,0,81,3)
+      Expand = True
+    }
+    { lblDuration Label
+      MoveScaled(88,1,6,2)
+      Text = ("0:00")
+    }
+  }
+}

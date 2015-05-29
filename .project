@@ -1,0 +1,18 @@
+# Gambas Project File 3.0
+# Compiled with Gambas 3.7.90
+Title=AudioSpectrum
+Startup=FMain
+Icon=AudioSpectrum.png
+Version=1.0.0
+Component=gb.image
+Component=gb.gui
+Component=gb.form
+Component=gb.gui.opengl
+Component=gb.opengl
+Component=gb.media
+Component=gb.opengl.glu
+Authors="Adrien Prokopowicz"
+Environment="GB_STOCK_DEBUG=1"
+TabSize=2
+Language=fr
+Packager=1

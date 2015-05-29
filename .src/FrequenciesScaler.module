@@ -1,0 +1,139 @@
+' Gambas module file
+
+Fast
+
+Private Const AUDIO_RATE As Integer = 44100
+Private Const BOTTOM_FREQUENCY As Integer = 4
+Private Const TOP_FREQUENCY As Integer = 40000
+
+Private Const THRESHOLD As Integer = 50
+
+Property OutputBands As Integer
+
+Private $aBandList As Float[]
+Private $aBandLengths As Integer[]
+Private $aScaledBandValues As Float[]
+Private $aSmoothedBandValues As Float[]
+Private $aSmoothedBandValues2 As Float[]
+
+Private magIStart As Integer
+
+Private $iInputBands As Integer
+Private $iOutputBands As Integer
+
+Private Sub GenerateBandList()
+  
+  Dim i, x As Float
+  Dim band As Float
+  
+  For i = 0 To $aBandList.Max
+    x = i / $aBandList.Max
+    'band = Exp((Log(TOP_FREQUENCY) - Log(BOTTOM_FREQUENCY)) * x + Log(BOTTOM_FREQUENCY))
+    band = 10 ^ ((Log10(TOP_FREQUENCY) - Log10(BOTTOM_FREQUENCY)) * x + Log10(BOTTOM_FREQUENCY))
+    $aBandList[i] = band
+  Next
+  
+End
+
+Public Sub SetInputBands($iInputBandsCount As Integer)
+  
+  Dim i As Integer
+  Dim frequency, band As Integer
+  $iInputBands = $iInputBandsCount
+  
+  GenerateBandList()
+  
+  $aBandLengths.Fill(0)
+  magIStart = 0
+  
+  For i = 0 To $iInputBands - 1
+    frequency = (i / $iInputBands) * AUDIO_RATE
+    band = GetFrequencyBand(frequency)
+    If band >= 0 Then 
+      Inc $aBandLengths[band]
+    Else If band = -1 
+      Inc magIStart
+    Endif
+  Next
+  
+  For i = 0 To $aBandLengths.Max
+    If $aBandLengths[i] = 0 Then 
+      Inc $aBandLengths[i]
+    Endif
+  Next
+  
+End
+
+Public Sub ScaleFrequencies(magnitudes As Float[]) As Float[]
+  
+  Dim i, j, magI As Integer
+  
+  If magnitudes.Count <> $iInputBands Then Return magnitudes
+  
+  magI = magIStart
+  $aScaledBandValues.Fill(-Inf)
+  For i = 0 To $aBandLengths.Max
+    For j = 0 To ($aBandLengths[i] - 1)
+      $aScaledBandValues[i] = Max(magnitudes[magI], $aScaledBandValues[i])
+      Inc magI
+    Next
+  Next
+  
+  Return $aScaledBandValues
+  
+End
+
+Private Sub GetFrequencyBand(frequency As Integer) As Integer
+
+  Dim i As Integer
+  If frequency < $aBandList[0] Then Return -1
+  
+  For i = 1 To $aBandList.Max
+    If $aBandList[i] > frequency Then Return i - 1
+  Next
+  
+  Return -2
+  
+End
+
+Private Const ALPHA As Float = 0.5
+Private Const ALPHA2 As Float = 0.7
+
+Public Sub SmoothFrequencies(aSpectrum As Float[]) As Float[]
+  
+  Dim i As Integer
+  
+  $aSmoothedBandValues.Fill(0)
+  
+  $aSmoothedBandValues[0] = aSpectrum[0]
+  For i = 1 To $aSmoothedBandValues.Max
+    $aSmoothedBandValues[i] = ALPHA * aSpectrum[i - 1] + (1 - ALPHA) * $aSmoothedBandValues[i - 1]
+  Next
+  
+  $aSmoothedBandValues2.Fill(0)
+  $aSmoothedBandValues2[$aSmoothedBandValues.Max] = $aSmoothedBandValues[$aSmoothedBandValues.Max]
+  For i = $aSmoothedBandValues.Max - 1 To 0 Step -1
+    $aSmoothedBandValues2[i] = ALPHA2 * $aSmoothedBandValues[i + 1] + (1 - ALPHA2) * $aSmoothedBandValues2[i + 1]
+  Next
+  
+  Return $aSmoothedBandValues2
+  
+End
+
+'===== Properties =====
+
+Private Function OutputBands_Read() As Integer
+  Return $iOutputBands
+End
+
+Private Sub OutputBands_Write(Value As Integer)
+
+  $iOutputBands = Value
+  $aBandList = New Float[$iOutputBands]
+  $aBandLengths = New Integer[$iOutputBands]
+  $aScaledBandValues = New Float[$iOutputBands]
+  $aSmoothedBandValues = New Float[$iOutputBands]
+  $aSmoothedBandValues2 = New Float[$iOutputBands]
+  SetInputBands($iInputBands)
+  
+End

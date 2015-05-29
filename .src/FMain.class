@@ -1,0 +1,193 @@
+' Gambas class file
+
+Fast
+
+Private $bMouseOverForm As Boolean = False
+
+Public Sub _new()
+
+  SetFileName(Null)
+  SpectrumPlayer.GLArea = GLArea1
+  Object.Attach(SpectrumPlayer, Me, "Player")
+  
+End
+
+Public Sub Form_Resize()
+  
+  GLArea1.Refresh()
+  
+End
+
+
+Public Sub Form_Close()
+
+  SpectrumPlayer.Stop()
+
+End
+
+Private Sub SetPlaying(bPlaying As Boolean)
+  
+  If bPlaying Then
+    SpectrumPlayer.Play()
+    btnPlay.Picture = Picture["icon:/small/pause"]
+  Else
+    SpectrumPlayer.Pause()
+    btnPlay.Picture = Picture["icon:/small/play"]
+  Endif
+  
+End
+
+Private Sub SetFileName(sFileName As String)
+  
+  Dim bIsFileOpen As Boolean = sFileName <> Null
+  
+  lblTrackName.Text = File.Name(sFileName)
+  SpectrumPlayer.FileName = sFileName
+  
+  boxTime.Enabled = bIsFileOpen
+  btnPlay.Enabled = bIsFileOpen
+  btnStop.Enabled = bIsFileOpen
+  
+End
+
+Public Sub SetPosition(fPosition As Float)
+  
+  SpectrumPlayer.Pause()
+  sliderProgress.Value = fPosition
+  SpectrumPlayer.Position = sliderProgress.Value
+  lblPosition.Text = GetTimeString(SpectrumPlayer.Position)
+  
+End
+
+
+Public Sub btnPlay_Click()
+
+  SetPlaying(Not SpectrumPlayer.Playing)
+
+End
+
+Public Sub btnStop_Click()
+
+  SetPlaying(False)
+  SpectrumPlayer.Stop()
+
+End
+
+Public Sub Player_Progress()
+  
+  sliderProgress.Value = SpectrumPlayer.Position
+  lblPosition.Text = GetTimeString(SpectrumPlayer.Position)
+  Player_Duration()
+  
+End
+
+Public Sub Player_Duration()
+
+  sliderProgress.MaxValue = SpectrumPlayer.Duration
+  lblDuration.Text = GetTimeString(SpectrumPlayer.Duration)
+  
+End
+
+Public Sub sliderProgress_MouseDown()
+
+  If Not SpectrumPlayer.FileName Then Return
+  SetPosition((Mouse.X / sliderProgress.Width) * sliderProgress.MaxValue)
+  Stop Event
+  
+End
+
+Public Sub sliderProgress_MouseUp()
+
+  If Not SpectrumPlayer.FileName Then Return
+  SpectrumPlayer.Play()
+
+End
+
+Public Sub Smoothing_Click()
+  
+  SpectrumPlayer.Smoothing = Last.Value
+  
+End
+
+Public Sub Scaling_Click()
+  
+  SpectrumPlayer.LogarithmicScale = Last.Value
+  
+End
+
+Private Sub GetTimeString(seconds As Float) As String
+  
+  Dim tDate As Date = Date(0, 0, 0, CInt(seconds / 60 / 60), CInt(seconds / 60) Mod 60, CInt(seconds) Mod 60, 0)
+  
+  If Hour(tDate) > 0 Then
+    Return Format(tDate, "hh:nn:ss")
+  Else
+    Return Format(tDate, "nn:ss")
+  Endif
+  
+End
+
+Public Sub btnOpen_Click()
+
+  Dim sFile As String 
+  Dialog.Title = ("Open an audio file.")
+  If Dialog.OpenFile() Then Return
+  sFile = Dialog.Path
+  
+  SpectrumPlayer.Stop()
+  SetFileName(sFile)
+  SetPlaying(True)
+  
+  Catch
+    Message.Error(Error.Text)
+End
+
+Public Sub SetUIVisible(Optional bVisible As Boolean = $bMouseOverForm)
+  
+  If LockUI.Checked Then bVisible = True
+  boxControls.Visible = bVisible
+  boxTime.Visible = bVisible
+  
+End
+
+
+Public Sub Form_KeyPress()
+  
+  If Not SpectrumPlayer.FileName Then Return
+  
+  Select Case Key.Code
+    Case Key.Space
+      btnPlay_Click()
+    Case Key.Left
+      SetPosition(sliderProgress.Value - sliderProgress.Step)
+      SpectrumPlayer.Play()
+    Case Key.Right
+      SetPosition(sliderProgress.Value + sliderProgress.Step)
+      SpectrumPlayer.Play()
+    Default
+      Return
+  End Select
+  
+  Stop Event
+End
+
+
+Public Sub Form_Enter()
+
+  $bMouseOverForm = True
+  SetUIVisible()
+
+End
+
+Public Sub Form_Leave()
+
+  $bMouseOverForm = False
+  SetUIVisible()
+
+End
+
+Public Sub Form_Open()
+
+  Me.Center()
+
+End

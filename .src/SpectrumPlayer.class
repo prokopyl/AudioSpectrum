@@ -1,0 +1,283 @@
+' Gambas class file
+
+Fast
+Create Static
+
+'Spectrum settings
+Private Const UPDATES_PER_SECOND As Integer = 30
+Private Const BANDS As Integer = 96
+Private Const THRESHOLD As Integer = 50
+Private Const LOGARITHMIC_INPUT_BANDS As Integer = 4096
+
+'Rendering settings
+Private Const FRAMES_PER_SECOND As Integer = 60
+Private Const PADDING As Float = 1
+
+Property FileName As String
+Property LogarithmicScale As Boolean
+Property Smoothing As Boolean
+Property {GLArea} As GLArea
+Property Position As Float
+Property Read Duration As Float
+Property Read Playing As Boolean
+
+Event Progress
+Event Duration
+
+Private $hPlayer As New MediaPlayer(Null, "playbin", (1000 / UPDATES_PER_SECOND)) As "Player"
+
+Private $container As New MediaContainer($hPlayer)
+Private $spectrum As New MediaControl($container, "spectrum")
+Private $sink As New MediaControl($container, "autoaudiosink")
+
+Private $hGLArea As GLArea
+
+Private $aOriginalSpectrum As Float[]
+Private $aSpectrum As Float[]
+Private $aPreviousSpectrum As New Float[BANDS]
+
+Private $timUpdate As New Timer As "Update"
+Private $timProgress As New Timer As "Progress"
+
+Public Sub _new()
+
+  FrequenciesScaler.OutputBands = BANDS
+  Me.LogarithmicScale = True
+  Me.Smoothing = True
+  FrequenciesScaler.SetInputBands(LOGARITHMIC_INPUT_BANDS)
+  
+  $spectrum["threshold"] = - THRESHOLD
+  $spectrum["interval"] = (1000 / UPDATES_PER_SECOND) * 1e6
+  
+  $spectrum.LinkTo($sink)
+  $container.AddInput($spectrum, "sink")
+  $hPlayer.Audio.Output = $container
+  
+  $timUpdate.Delay = 1000 / FRAMES_PER_SECOND
+  $timProgress.Delay = 250
+  
+End
+
+
+Public Sub Play()
+  
+  $hPlayer.Play()
+  $timUpdate.Start()
+  $timProgress.Start()
+  
+End
+
+Public Sub Pause()
+  
+  $hPlayer.Pause()
+  $timUpdate.Stop()
+  $timProgress.Stop()
+  
+End
+
+Public Sub Stop()
+  
+  $hPlayer.Stop()
+  $timUpdate.Stop()
+  $timProgress.Stop()
+  
+End
+
+Private Sub FileName_Write(Value As String)
+
+  $sFileName = Value
+  $hPlayer.URL = Media.URL($sFileName)
+  
+End
+
+Private Sub LogarithmicScale_Write(Value As Boolean)
+
+  $bLogarithmicScale = Value
+  
+  If $bLogarithmicScale Then
+    SetInputBands(LOGARITHMIC_INPUT_BANDS)
+  Else
+    SetInputBands(BANDS)
+  Endif
+
+End
+
+Private Sub Smoothing_Write(Value As Boolean)
+
+  $bSmoothing = Value
+
+End
+
+'===== Internal Methods =====
+
+Private Sub SetInputBands(iBands As Integer)
+  
+  $spectrum["bands"] = iBands
+  
+End
+
+Public Sub Player_Event(hMessage As MediaMessage)
+  
+  If hMessage.Type <> MediaMessage.Element Then Return
+  
+  If hMessage.Name <> "spectrum" Then 'That's not the data we want
+    Print Subst(("&1 sent data."), hMessage.Name)
+    Return
+  Endif
+  
+  $aOriginalSpectrum = hMessage["magnitude"]
+  If $aOriginalSpectrum.Count <> BANDS Then
+    $aSpectrum = FrequenciesScaler.ScaleFrequencies($aOriginalSpectrum)
+  Else
+    $aSpectrum = $aOriginalSpectrum
+  Endif
+  
+  If $bSmoothing Then
+    $aSpectrum = FrequenciesScaler.SmoothFrequencies($aSpectrum)
+  Endif
+  
+End
+
+Public Sub Player_End()
+  
+  Stop()
+  Play()
+  
+End
+
+
+'===== Rendering =====
+
+Public Sub Update_Timer()
+  
+  $hGLArea.Refresh()
+  
+End
+
+Public Sub Progress_Timer()
+  
+  Raise Progress
+  
+End
+
+Public Sub Player_Duration()
+
+  Raise Duration
+  
+End
+
+Public Sub GLArea_Draw()
+
+  Dim i As Integer
+  Dim height, maxheight As Float
+  Dim value As Float
+  Dim width As Float
+  Dim fPadding As Float = (PADDING / Last.W) * 2
+  
+  Dim barx, bary, barx2, bary2 As Float
+  
+  If Not $aSpectrum Then 
+    $aSpectrum = New Float[BANDS]
+    $aSpectrum.Fill(- THRESHOLD)
+  Endif
+  
+  width = 2 / ($aSpectrum.Count)
+  
+  maxheight = 2
+  Gl.Disable(GL.DITHER)
+  GL.ShadeModel(GL.FLAT)
+  GL.LoadIdentity()
+  
+  
+  GL.Begin(GL.QUADS)
+  GL.Color3f(0, 0, 0.05)
+  GL.Vertex3f(2, -2, 1)
+  GL.Vertex3f(2, 2, 1)
+  GL.Vertex3f(-2, 2, 1)
+  GL.Vertex3f(-2, -2, 1)
+  GL.End()
+  
+  GL.Color3f(1, 1, 1)
+  GL.Begin(GL.QUADS)
+  For i = 0 To $aSpectrum.Max
+    
+    If $aPreviousSpectrum[i] <= $aSpectrum[i] Then
+      value = ($aSpectrum[i]) + THRESHOLD
+    Else
+      value = ($aSpectrum[i] + THRESHOLD + ($aPreviousSpectrum[i]) * 2) / 3 
+    Endif
+    
+    $aPreviousSpectrum[i] = value
+    
+    height = ((value) / ((THRESHOLD) / 1.9)) * maxheight
+     
+    barx = i * width + fPadding - 1
+    barx2 = barx + width - fPadding - fPadding
+    bary = -1
+    bary2 = bary + height
+    
+    gl.Vertex2f(barx, bary2)                    'Top Left
+    gl.Vertex2f(barx2, bary2)                     'Top Right
+    gl.Vertex2f(barx2, bary)                    'Bottom Right
+    gl.Vertex2f(barx, bary)                   'Bottom Left
+  Next
+  
+  GL.End()
+
+End
+
+Public Sub GLArea_Resize()
+  GL.Viewport(0, 0, Last.W, Last.H)
+End
+
+'===== Properties =====
+
+Private $sFileName As String
+Private $bLogarithmicScale As Boolean
+Private $bSmoothing As Boolean
+
+Private Function FileName_Read() As String
+  Return $sFileName
+End
+
+Private Function LogarithmicScale_Read() As Boolean
+  Return $bLogarithmicScale
+End
+
+Private Function Smoothing_Read() As Boolean
+  Return $bSmoothing
+End
+
+Private Function GLArea_Read() As GLArea
+  Return $hGLArea
+End
+
+Private Sub GLArea_Write(Value As GLArea)
+
+  If $hGLArea Then Object.Detach($hGLArea)
+  $hGLArea = Value
+  Object.Attach($hGLArea, Me, "GLArea")
+
+End
+
+Private Function Position_Read() As Float
+  Return $hPlayer.Position
+End
+
+Private Sub Position_Write(Value As Float)
+
+  Dim wasPlaying As Boolean = Me.Playing
+  
+  If wasPlaying Then $hPlayer.Pause()
+  $hPlayer.Position = Value
+  If wasPlaying Then $hPlayer.Play()
+
+End
+
+Private Function Duration_Read() As Float
+  Return $hPlayer.Duration
+End
+
+Private Function Playing_Read() As Boolean
+  Return $hPlayer.State = Media.Playing
+End
