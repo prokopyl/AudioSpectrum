@@ -4,19 +4,22 @@ Count=0
 [DebugWindow]
 Count=0
 
-[DebugWindow/$aOriginalSpectrum]
-Geometry=[0,38,224,280]
+[DebugWindow/$aPreviousSpectrum]
+Geometry=[683,370,224,280]
 
-[DebugWindow/Data["magnitude"]]
-Geometry=[0,38,702,280]
+[DebugWindow/Gl]
+Geometry=[683,370,224,280]
+
+[Executable]
+Path="audiospectrum.gambas"
 
 [OpenFile]
+File[1]=".src/SpectrumPlayer.class:0.4"
+Active=1
+File[2]=".src/FrequenciesScaler.module:0.97"
 Count=4
-Active=2
-File[1]=".src/FMain.form"
-File[2]=".src/FMain.class:13.190"
-File[3]=".src/FrequenciesScaler.module:35.99"
-File[4]=".src/SpectrumPlayer.class:0.117"
+File[3]=".src/FMain.class:2.118"
+File[4]=".src/FMain.form"
 
 [Watches]
 Count=0

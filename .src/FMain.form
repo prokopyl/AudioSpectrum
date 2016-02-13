@@ -23,8 +23,12 @@
     { LockUI Menu
       Text = ("Lock User Interface")
       Toggle = True
-      Checked = True
       Shortcut = "Ctrl+I"
+    }
+    { DarkColors Menu
+      Text = ("Dark Colors")
+      Toggle = True
+      Shortcut = "Ctrl+D"
     }
   }
   { GLArea1 GLArea

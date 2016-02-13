@@ -13,9 +13,24 @@ Private Const LOGARITHMIC_INPUT_BANDS As Integer = 4096
 Private Const FRAMES_PER_SECOND As Integer = 60
 Private Const PADDING As Float = 1
 
+'Color settings
+Private Const BRIGHT_COLOR_BASE As Integer = &A0A0A2
+Private Const BRIGHT_COLOR_TIP As Integer = &FFF2FFFD
+Private Const DARK_COLOR_BASE As Integer = &10001A
+Private Const DARK_COLOR_TIP As Integer = &F0F0F2
+Private COLOR_TIP As Integer = &F2FFFD
+Private COLOR_BASE As Integer = &A0A0A2 '&000020 '&A0A0A2
+Private Const COLOR_WEIGHT As Float = 1.5
+Private Const MAX_COLOR As Float = 1.5
+Private Const MIN_COLOR As Float = 0.9
+Private Const BACKGROUND_COLOR_BASE As Integer = &000008
+Private Const BACKGROUND_COLOR_LIGHT As Integer = &100033
+Private Const BACKGROUND_LIGHT_RATIO As Float = 2.5
+
 Property FileName As String
 Property LogarithmicScale As Boolean
 Property Smoothing As Boolean
+Property Dark As Boolean
 Property {GLArea} As GLArea
 Property Position As Float
 Property Read Duration As Float
@@ -35,6 +50,8 @@ Private $hGLArea As GLArea
 Private $aOriginalSpectrum As Float[]
 Private $aSpectrum As Float[]
 Private $aPreviousSpectrum As New Float[BANDS]
+Private $aSpectrumMean As Float
+Private $aPreviousMean As Float = 0
 
 Private $timUpdate As New Timer As "Update"
 Private $timProgress As New Timer As "Progress"
@@ -56,6 +73,9 @@ Public Sub _new()
   $timUpdate.Delay = 1000 / FRAMES_PER_SECOND
   $timProgress.Delay = 250
   
+  Env["PULSE_PROP_application.icon_name"] = "audiospectrum"
+  Env["PULSE_PROP_media.role"] = "music"
+  
 End
 
 
@@ -64,6 +84,7 @@ Public Sub Play()
   $hPlayer.Play()
   $timUpdate.Start()
   $timProgress.Start()
+  Env["PULSE_PROP_media.title"] = File.BaseName(Me.FileName)
   
 End
 
@@ -173,6 +194,7 @@ Public Sub GLArea_Draw()
   Dim value As Float
   Dim width As Float
   Dim fPadding As Float = (PADDING / Last.W) * 2
+  Dim iColor As Float
   
   Dim barx, bary, barx2, bary2 As Float
   
@@ -188,21 +210,25 @@ Public Sub GLArea_Draw()
   GL.ShadeModel(GL.FLAT)
   GL.LoadIdentity()
   
-  
+  '$aSpectrumMean *= BACKGROUND_LIGHT_RATIO
   GL.Begin(GL.QUADS)
-  GL.Color3f(0, 0, 0.05)
+'   Print $aSpectrumMean / maxheight * BACKGROUND_LIGHT_RATIO
+  GbColor(Color.Gradient(BACKGROUND_COLOR_BASE, BACKGROUND_COLOR_LIGHT, Min(($aSpectrumMean / maxheight) * BACKGROUND_LIGHT_RATIO, 1)))
+'   GL.Color3f(0.03, 0, $aSpectrumMean + 0.05)
   GL.Vertex3f(2, -2, 1)
   GL.Vertex3f(2, 2, 1)
   GL.Vertex3f(-2, 2, 1)
   GL.Vertex3f(-2, -2, 1)
   GL.End()
   
-  GL.Color3f(1, 1, 1)
+  $aPreviousMean = $aSpectrumMean
+  $aSpectrumMean = 0
+  
   GL.Begin(GL.QUADS)
   For i = 0 To $aSpectrum.Max
     
-    If $aPreviousSpectrum[i] <= $aSpectrum[i] Then
-      value = ($aSpectrum[i]) + THRESHOLD
+    If $aPreviousSpectrum[i] <= $aSpectrum[i] + THRESHOLD Then
+      value = ($aSpectrum[i] + THRESHOLD + ($aPreviousSpectrum[i]) * 2) / 3 
     Else
       value = ($aSpectrum[i] + THRESHOLD + ($aPreviousSpectrum[i]) * 2) / 3 
     Endif
@@ -210,21 +236,52 @@ Public Sub GLArea_Draw()
     $aPreviousSpectrum[i] = value
     
     height = ((value) / ((THRESHOLD) / 1.9)) * maxheight
-     
+    
+    iColor = Color.Gradient(COLOR_BASE, COLOR_TIP, Min(((value) / ((THRESHOLD) / 1.9)) * COLOR_WEIGHT, 1))
+    
+'     iColor = ((value) / ((THRESHOLD) / 1.9)) * (MAX_COLOR - MIN_COLOR) + MIN_COLOR
+    
+    $aSpectrumMean += height
+    
     barx = i * width + fPadding - 1
     barx2 = barx + width - fPadding - fPadding
     bary = -1
     bary2 = bary + height
     
+    GbColor(iColor)
     gl.Vertex2f(barx, bary2)                    'Top Left
     gl.Vertex2f(barx2, bary2)                     'Top Right
     gl.Vertex2f(barx2, bary)                    'Bottom Right
     gl.Vertex2f(barx, bary)                   'Bottom Left
   Next
+  $aSpectrumMean /= $aSpectrum.Max
+  
+  If $aSpectrumMean < $aPreviousMean Then
+    $aSpectrumMean = ($aPreviousMean * 3 + $aSpectrumMean) / 4
+  Else
+    $aSpectrumMean = ($aPreviousMean + $aSpectrumMean) / 2
+  Endif
   
   GL.End()
 
 End
+
+Private Sub GbColor(iColor As Integer)
+  
+  Dim r, g, b, a As Float
+  
+  a = Lsr(iColor And &FF0000, 24) / 255.0
+  r = Lsr(iColor And &FF0000, 16) / 255.0
+  g = Lsr(iColor And &00FF00, 8) / 255.0
+  b = (iColor And &0000FF) / 255.0
+  
+'   Print r, g, b
+  
+  Gl.Color4f(r, g, b, 0)
+  
+End
+
+
 
 Public Sub GLArea_Resize()
   GL.Viewport(0, 0, Last.W, Last.H)
@@ -280,4 +337,22 @@ End
 
 Private Function Playing_Read() As Boolean
   Return $hPlayer.State = Media.Playing
+End
+
+Private Function Dark_Read() As Boolean
+
+  Return COLOR_BASE = DARK_COLOR_BASE
+
+End
+
+Private Sub Dark_Write(Value As Boolean)
+
+  If Value Then
+    COLOR_BASE = DARK_COLOR_BASE
+    COLOR_TIP = DARK_COLOR_TIP
+  Else
+    COLOR_BASE = BRIGHT_COLOR_BASE
+    COLOR_TIP = BRIGHT_COLOR_TIP
+  Endif
+
 End

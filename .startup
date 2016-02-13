@@ -2,12 +2,13 @@ FMain
 AudioSpectrum
 0
 0
-1.0.0
+1.0.4
 
 gb.image
-gb.gui
+gb.qt5
 gb.form
-gb.gui.opengl
+gb.form.dialog
+gb.qt5.opengl
 gb.opengl
 gb.media
 gb.opengl.glu
